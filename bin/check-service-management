@@ -1,0 +1,24 @@
+#!/bin/bash
+
+source ~/engine-showcase/lib/styles.sh
+
+# Controleer op aanwezigheid van systemctl of service commando's
+if ! command -v systemctl >/dev/null && ! command -v service >/dev/null; then
+    gum style --foreground 196 "❌ Kritieke fout: Geen service management (systemctl/service) gevonden."
+    
+    echo ""
+    gum style --border normal --margin "0 1" --padding "0 2" --foreground 214 "Mogelijke oplossingen:"
+    
+    if [ -f /.dockerenv ]; then
+        echo "  • Je draait in Docker. Gebruik 'docker-compose' of start processen handmatig."
+    elif grep -qI "Microsoft" /proc/version 2>/dev/null; then
+        echo "  • Je gebruikt WSL 1. Upgrade naar WSL 2 of start services met 'sudo /etc/init.d/naam start'."
+    else
+        echo "  • Installeer systemd: 'sudo apt update && sudo apt install systemd'"
+        echo "  • Of controleer of je PATH correct is ingesteld."
+    fi
+    
+    exit 1
+else
+    success "service management checked"
+fi

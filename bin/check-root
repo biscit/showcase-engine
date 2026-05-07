@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Controleer of de gebruiker root-rechten heeft
+if [ "$EUID" -ne 0 ]; then
+    gum style --foreground 196 "❌ Fout: Dit script moet uitgevoerd worden met sudo of als root."
+    exit 1
+fi

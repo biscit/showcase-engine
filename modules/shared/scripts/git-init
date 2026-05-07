@@ -1,0 +1,34 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/styles.sh"
+
+# Usage function for standalone usage
+usage() {
+    gum style --foreground 212 --border normal --padding "0 1" \
+        "Arguments are missing" "" \
+        "Use: ${0##*/} <project_name> <visibility>"
+    exit 1
+}
+
+# check number of arguments
+if [ $# -ne 2 ]; then
+    usage
+fi
+
+PROJECT_NAME="$1"
+VISIBILITY="$2"
+
+info "Pushing project to GitHub..."
+
+# Git initialisation
+git init
+git add .
+git commit -m "initial commit of $PROJECT_NAME" --quiet
+
+gum spin --spinner dot --title "Creating and pushing repo '$PROJECT_NAME' to github..." -- \
+    gh repo create "$PROJECT_NAME" --$VISIBILITY --source=. --remote=origin --push
+
+success "Project '$PROJECT_NAME' pushed to github !"
+
+exit 0

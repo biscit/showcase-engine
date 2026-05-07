@@ -1,0 +1,69 @@
+#!/bin/bash
+
+trap 'stty sane' EXIT
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$SCRIPT_DIR/../lib/functions.sh"
+
+PHP_V=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "    Arguments are missing" "" / >&2
+    echo "    USE: <server_name> <log_dir>" >&2
+    exit 1
+fi
+
+SERVER_NAME="$1"
+LOG_DIR="$2"
+
+if [ ! -f "/etc/apache2/sites-available/${SERVER_NAME}.conf" ]; then
+    sudo mkdir -p "$LOG_DIR"
+    sudo chown -R $USER:www-data "$LOG_DIR"
+    sudo chmod -R 775 "$LOG_DIR"
+
+    # create vhost, also for subdomains
+    cat <<EOF | sudo tee /etc/apache2/sites-available/${SERVER_NAME}.conf > /dev/null
+<VirtualHost *:80>
+    ServerName ${SERVER_NAME}
+    ServerAlias www.${SERVER_NAME} *.${SERVER_NAME}
+
+    DocumentRoot $(pwd)/public
+
+    <Directory $(pwd)/public>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    <FilesMatch \.php$>
+        SetHandler "proxy:unix:/run/php/php$PHP_V-fpm.sock|fcgi://127.0.0.1"
+    </FilesMatch>
+
+    # Logs are saved in the project for convenience
+    ErrorLog ${LOG_DIR}/apache_error.log
+    CustomLog ${LOG_DIR}/apache_access.log combined
+</VirtualHost>
+EOF
+
+    if [ ${PIPESTATUS[1]} -ne 0 ]; then
+        echo "    vhost configuration file creation failed (cat)." >&2
+        add_to_do "Apache vhost could not be created in /etc/apache2/sites-available/"
+        exit 1
+    fi
+
+    sudo a2ensite ${SERVER_NAME}.conf > /dev/null 2>&1
+
+    if sudo apache2ctl configtest > /dev/null 2>&1; then
+        service_manager restart apache2
+    else
+        sudo a2dissite "${SERVER_NAME}.conf" > /dev/null 2>&1
+        echo "    syntax error in vhost configuration for vhost ${SERVER_NAME}!" >&2
+        add_to_do "Apache vhost syntax error for ${SERVER_NAME}. Application is not activated."
+        exit 1
+    fi
+else
+    echo "    vhost ${SERVER_NAME}.conf file already exists"
+fi
+
+exit 0

@@ -1,0 +1,218 @@
+#!/bin/bash
+
+# keep the sudo session alive as long as the script is running
+sudo -v
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
+# remove temporary files used in this installation
+rm -f /tmp/post_install_list
+rm -f /tmp/setup_todo_list
+rm -f /tmp/setup_checklist
+rm -f /tmp/laravel_install.log
+rm -f /tmp/additional_packages
+
+######################################################## start configuration and environment checks
+
+# path configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SHARED_SCRIPTS="$SCRIPT_DIR/modules/shared/scripts"
+SHARED_DATA_LISTS="$SCRIPT_DIR/modules/shared/data-lists"
+
+source "$SCRIPT_DIR/modules/shared/lib/functions.sh"
+source "$SCRIPT_DIR/modules/shared/lib/styles.sh"
+
+# create a file in the root of the project to store extra packages history per installed app
+PACKAGES_HISTORY="$SCRIPT_DIR/.installed_packages"
+[[ ! -f "$PACKAGES_HISTORY" ]] && touch "$PACKAGES_HISTORY"
+
+# create a file in the root of the project to store history of installed apps
+APP_HISTORY="$SCRIPT_DIR/.installed_apps"
+[[ ! -f "$APP_HISTORY" ]] && touch "$APP_HISTORY"
+
+# start framework selector and configure installation path
+INSTALLER_PATH=$("$SHARED_SCRIPTS/select-installation") || exit 1
+INSTALLATION_PATH="$SCRIPT_DIR/modules/$INSTALLER_PATH"
+
+# start services
+PHP_V=$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')
+$SHARED_SCRIPTS/start-service apache2 || exit 1
+$SHARED_SCRIPTS/start-service mysql || exit 1
+$SHARED_SCRIPTS/start-service "php$PHP_V-fpm" || exit 1
+
+# check dependencies
+$SHARED_SCRIPTS/check-php-modules || exit 1
+$SHARED_SCRIPTS/check-php-consistency || exit 1
+$SHARED_SCRIPTS/check-apache2-modrewrite || exit 1
+
+########################################################    start user input
+
+# prompt for git params
+source "$SHARED_SCRIPTS/git-init-configuration"
+
+# prompt for projectname
+source "$SHARED_SCRIPTS/prompt-and-check-projectname"
+
+# prompt for additional packages
+source "$SHARED_SCRIPTS/select-additional-packages"
+
+########################################################  start installer
+
+# setup summary
+gum style \
+  --border double \
+  --padding "1 2" \
+  --align center \
+  --width 100 \
+  --border-foreground 212 \
+  --foreground 212 \
+  "This bash script sets up a local development environment featuring :" \
+  "" \
+  "Laravel & Livewire" \
+  "MySQL database with a dedicated user" \
+  "Test environment with in-memory SQLite (for this showcase)" \
+  "Apache vhost with logs linked to storage/logs" \
+  "Custom daily logging" \
+  "Installation of additional packages & post-install actions" \
+  "Continuous Integration setup & GitHub deployment" \
+  "" \
+  "Please refer to the README.md file for more information"
+
+# install database and user
+if $SHARED_SCRIPTS/install-db-and-user "$DB_NAME" "$DB_USER" "$DB_PASSWORD"; then
+    success "database and user added"
+else
+    error "database installation failed"
+    exit 1
+fi
+
+# configure project root directory
+PROJECT_ROOT="/var/www/$PROJECT_NAME"
+
+# install laravel and navigate to the project root
+cd /var/www || { error "Error: cannot find /var/www"; exit 1; }
+$INSTALLATION_PATH/installer $PROJECT_NAME
+cd "$PROJECT_ROOT" || { error "Error: cannot find project directory"; exit 1; }
+
+# set project permissions
+if $INSTALLATION_PATH/set-project-permissions "$PROJECT_NAME"; then
+    success "permissions configured"
+else
+    warning "failed to configure permissions"
+    add_to_do "Check the permissions for this project"
+fi
+
+# configure database connection for project
+if $INSTALLATION_PATH/configure-db-environment "$DB_NAME" "$DB_USER" "$DB_PASSWORD" "$PROJECT_NAME"; then
+    success "database credentials are saved to config file"
+else 
+    warning "failed to save database credentials to config file"
+fi
+
+# configure apache2 vhost
+if $INSTALLATION_PATH/install-apache-vhost "$PROJECT_NAME" "$SERVER_NAME"; then
+    success "apache vhost was installed"
+else
+    warning "failed to install apache vhost"
+fi
+
+# configure app environment
+if $INSTALLATION_PATH/configure-app-environment "$PROJECT_NAME"; then
+    success "configured app environment"
+else
+    warning "failed to configure app environment"
+fi 
+
+# configure test environment with sqlite in memory 
+if $INSTALLATION_PATH/configure-test-environment "$PROJECT_NAME"; then
+    success "configured test environment"
+else
+    warning "failed to configure test environment"
+fi
+
+# install additional packages
+if [[ -s "/tmp/additional_packages" ]]; then
+    $SHARED_SCRIPTS/install-additional-packages "/tmp/additional_packages" "$PROJECT_NAME"
+    success "additional packages are installed"
+fi
+
+# run post-install actions
+if [[ -s "/tmp/post_install_list" ]]; then
+    $SHARED_SCRIPTS/run-post-install-actions "/tmp/post_install_list"
+    success "post-install actions completed"
+fi
+
+# configure logging for daily logs
+if $INSTALLATION_PATH/configure-logging "$PROJECT_NAME"; then
+    success "configured logging"
+else
+    warning "failed to configure logging"
+fi
+
+# Creating README.md file
+if $SHARED_SCRIPTS/add-readme-file "$PROJECT_NAME"; then
+    success "README.md file added"
+else
+    warning "failed to add README.md file"
+fi
+
+# build frontend
+if $INSTALLATION_PATH/install-frontend "$PROJECT_NAME"; then
+    success "configured frontend"
+else
+    warning "failed to configure frontend"
+fi
+
+# make the project ci ready
+if $INSTALLATION_PATH/set-project-ci-ready; then
+    success "project is ci ready"
+else
+    warning "failed to set project ci ready"
+fi
+
+# check if project is ready to be pushed to github ; otherwise show failed and manual actions
+if [ -s "/tmp/setup_todo_list" ]; then
+    TO_DO_LIST=$(cat /tmp/setup_todo_list)
+    gum style --border double --padding "1 2" "MANUAL ACTIONS:" "$TO_DO_LIST"
+
+    rm /tmp/setup_todo_list
+else
+    # push project to github if permissioned
+    if "${GIT_PARAMS[permission]}"; then
+        $SHARED_SCRIPTS/git-init "$PROJECT_NAME" "${GIT_PARAMS[visibility]}"
+    fi
+fi
+
+if [ -s "/tmp/setup_checklist" ]; then
+    CHECKLIST=$(cat /tmp/setup_checklist)
+    gum style --border double --padding "1 2" "Check this to be sure:" "$CHECKLIST"
+    
+    rm /tmp/setup_checklist
+fi
+
+TERMINAL_WIDTH=$(tput cols)
+
+echo ""
+gum style \
+  --background 212 \
+  --foreground 0 \
+  --width "$TERMINAL_WIDTH" \
+  "" \
+  "  Copy following lines to your C:\Windows\System32\drivers\etc\hosts file (open hosts file as administrator!) :" \
+  "" \
+  "127.0.0.1 $PROJECT_NAME.local" \
+  "::1 $PROJECT_NAME.local" \
+  "" \
+  "  When using subdomains, you should also add them to your hosts file, like this :" \
+  "" \
+  "127.0.0.1 $PROJECT_NAME.local" \
+  "::1 $PROJECT_NAME.local" \
+  "127.0.0.1 domain.$PROJECT_NAME.local" \
+  "::1 domain.$PROJECT_NAME.local" \
+  ""
+echo ""
+
+MINUTES=$(( SECONDS / 60 ))
+SECONDS=$(( SECONDS % 60 ))
+info "This script ran $MINUTES minutes and $SECONDS seconds"
+
+exit 0

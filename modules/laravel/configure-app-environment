@@ -1,0 +1,37 @@
+#!/bin/bash
+
+# Determine absolute path where this script lives
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/lib/functions.sh"
+source "$SCRIPT_DIR/../shared/lib/styles.sh"
+
+# Standalone usage
+usage() {
+    gum style --foreground 212 --border normal --padding "0 1" \
+        "Arguments are missing" "" \
+        "Use: ${0##*/} <project_name>" \
+    exit 1
+}
+
+PROJECT_NAME="$1"
+APP_NAME=$(echo "$PROJECT_NAME" | sed 's/[-_]/ /g' | awk '{for(i=1;i<=NF;i++) $i=toupper(substr($i,1,1)) substr($i,2)} 1')
+
+# Check arguments
+if [ $# -ne 1 ]; then
+    usage
+fi
+
+info "Configuring app environment..."
+
+cd "/var/www/$PROJECT_NAME"
+
+if [ -f .env ]; then
+    sed -i "s|^APP_NAME=.*|APP_NAME=\"$APP_NAME\"|" .env
+    sed -i "s|^APP_URL=.*|APP_URL=http://$PROJECT_NAME.local|" .env
+    sed -i "s|^SESSION_DOMAIN=.*|SESSION_DOMAIN=.$PROJECT_NAME.local|" .env
+else
+    add_to_do "failed to configure app environment : .env file not found"
+    exit 1
+fi
+
+exit 0

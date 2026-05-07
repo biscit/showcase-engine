@@ -1,0 +1,45 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$SCRIPT_DIR/../lib/styles.sh"
+source "$SCRIPT_DIR/../lib/functions.sh"
+
+# Required extensions
+EXTENSIONS=("pdo_mysql" "bcmath" "xml" "mbstring" "tokenizer" "json" "curl")
+
+MISSING=()
+
+for ext in "${EXTENSIONS[@]}"; do
+    # Check CLI
+    if ! php -m | grep -qi "$ext"; then
+        MISSING+=("CLI: $ext")
+    fi
+    
+    # Check Apache
+    echo "<?php echo extension_loaded('$ext') ? '1' : '0';" | sudo tee /var/www/html/ext_check.php > /dev/null
+    WEB_RESULT=$(curl -s http://127.0.0.1/ext_check.php)
+    
+    if [ "$WEB_RESULT" != "1" ]; then
+        MISSING+=("WEB: $ext")
+    fi
+done
+
+#sudo rm /var/www/html/ext_check.php > /dev/null
+
+# Result
+if [ ${#MISSING[@]} -eq 0 ]; then
+    success "Modules checked and loaded in CLI en Apache2 : ${EXTENSIONS[*]}"
+    exit 0
+else
+    error "Following extensions are missing :"
+    for m in "${MISSING[@]}"; do
+        echo "   - $m"
+    done
+    
+    echo ""
+    echo "Install missing extensions with : sudo apt install php-<name>"
+    exit 1
+fi
+
+exit 0

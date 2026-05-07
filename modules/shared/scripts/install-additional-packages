@@ -1,0 +1,45 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/functions.sh"
+source "$SCRIPT_DIR/../lib/styles.sh"
+
+info "Installing additional packages..."
+
+PACKAGE_FILE="$1"
+PROJECT_NAME="$2"
+
+HISTORY_FILE="$SCRIPT_DIR/../../../.installed_packages"
+
+if [ -f "$PACKAGE_FILE" ]; then
+    while IFS= read -r line <&3; do
+        read -r pkg opt <<< "$line"
+
+        gum spin --spinner dot --title "Installing $pkg..." -- \
+            composer require "$pkg" $opt --with-all-dependencies --no-interaction
+
+        if [ $? -eq 0 ]; then
+            echo "    $pkg is installed."
+            add_post_install "$pkg"
+
+            if [[ -n "$opt" ]]; then
+                package="$pkg $opt"
+            else
+                package="$pkg"
+            fi
+            
+            FILE_ENTRY="$PROJECT_NAME:$package"
+            echo "$FILE_ENTRY" >> "$HISTORY_FILE"
+        else
+            echo "    failed to install $pkg. Check composer.json."
+            add_to_do "package $pkg was not installed, check composer.json"
+        fi
+
+        FILE_ENTRY=""
+
+    done 3< "$PACKAGE_FILE"
+fi
+
+rm "$PACKAGE_FILE"
+
+exit 0

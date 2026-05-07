@@ -1,0 +1,44 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/lib/styles.sh"
+
+usage() {
+    gum style --foreground 212 --border normal --padding "0 1" \
+        "Arguments are missing" "" \
+        "USE: ${0##*/} <DB_NAME> <DB_USER> <DB_PASSWORD> <PROJECT_NAME>"
+    exit 1
+}
+
+if [ $# -ne 4 ]; then
+    usage
+fi
+
+DB_NAME="$1"
+DB_USER="$2"
+DB_PASSWORD="$3"
+PROJECT_NAME="$4"
+
+info "configuring .env with database credentials..."
+
+cd "/var/www/$PROJECT_NAME"
+
+if [ -f .env ]; then
+    sed -i "s|^DB_DATABASE=.*|DB_DATABASE=$DB_NAME|" .env
+    sed -i "s|^DB_USERNAME=.*|DB_USERNAME=$DB_USER|" .env
+    sed -i "s|^DB_PASSWORD=.*|DB_PASSWORD=$DB_PASSWORD|" .env
+    sed -i "s|^DB_CONNECTION=.*|DB_CONNECTION=mysql|" .env
+    sed -i "s|^DB_HOST=.*|DB_HOST=127.0.0.1|" .env
+    sed -i "s|^DB_PORT=.*|DB_PORT=3306|" .env
+
+    php artisan config:clear
+    php artisan migrate --force  
+else
+    add_to_do ".env not found. Database credentials are not configured"
+    exit 1
+fi
+
+
+
+
+exit 0

@@ -1,0 +1,47 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$SCRIPT_DIR/../lib/functions.sh"
+source "$SCRIPT_DIR/../lib/styles.sh"
+
+# Usage standalone
+usage() {
+    gum style --foreground 212 --border normal --padding "0 1" \
+        "Arguments are missing" "" \
+        "Use: ${0##*/} <service_name> [options]" "" \
+        "options : -q     no output (except errors)"
+    exit 1
+}
+
+# Check if first argument is not empty
+[ -z "$1" ] && usage
+
+# Check if first argument is not the option
+[[ "$1" == -* ]] && usage
+
+SERVICE=$1
+QUIET_MODE=false
+
+if [[ "$2" == "-q" ]]; then
+    QUIET_MODE=true
+fi
+
+# check if service is running
+if ! service_manager status "$SERVICE" > /dev/null; then
+    gum spin --spinner dot --title "Starting $SERVICE service..." -- \
+        service_manager start "$SERVICE" \
+        sleep 5
+fi
+
+# final service control
+if service_manager status "$SERVICE" > /dev/null; then
+    if [ "$QUIET_MODE" = false ]; then
+        success "$SERVICE is running"
+    fi
+else
+    error "could not start up $SERVICE"
+    exit 1
+fi
+
+exit 0

@@ -1,0 +1,36 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/lib/functions.sh"
+source "$SCRIPT_DIR/../shared/lib/styles.sh"
+
+usage() {
+    gum style --foreground 212 --border normal --padding "0 1" \
+        "Arguments are missing" "" \
+        "Use: ${0##*/} <project_name>"
+
+    add_to_do "frontend is not configured"
+    
+    exit 1
+}
+
+# Check arguments
+if [ $# -ne 1 ]; then
+    usage
+fi
+
+info "Installing frontend..."
+
+PROJECT_NAME="$1"
+LOG_FILE="storage/logs/frontend_build.log"
+
+cd "/var/www/$PROJECT_NAME"
+
+if ! gum spin --spinner dot --title "Configuring frontend..." -- \
+        bash -c "npm install --no-audit --no-fund && npm run build &> $LOG_FILE"; then
+
+    add_to_do "frontend not installed, see $LOG_FILE"
+    exit 1
+fi
+    
+exit 0

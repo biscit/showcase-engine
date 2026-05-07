@@ -1,0 +1,23 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+MODULE=""
+SELECTED_MODULE=""
+
+# Get the names of the modules directories except 'shared'
+MODULE_OPTIONS=($(ls -d $SCRIPT_DIR/../../../modules/*/ | xargs -n 1 basename | grep -v "shared"))
+
+
+while [[ -z "$MODULE"  ]]; do
+    SELECTED_MODULE=$(gum choose --header "Which framework (or CMS) do you want to install ?" "${MODULE_OPTIONS[@]}")
+    
+    if $SCRIPT_DIR/check-framework-installation $SELECTED_MODULE > /dev/null; then
+        MODULE="$SELECTED_MODULE"
+        echo "$MODULE"
+    else
+        MODULE_OPTIONS=(${MODULE_OPTIONS[@]//*$SELECTED_MODULE*})
+    fi
+done
+
+exit 0

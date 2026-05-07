@@ -1,0 +1,44 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/lib/functions.sh"
+source "$SCRIPT_DIR/../shared/lib/styles.sh"
+
+SHARED_SCRIPTS="$SCRIPT_DIR/../shared/scripts"
+
+usage() {
+    gum style --foreground 212 --border normal --padding "0 1" \
+        "Arguments are missing" "" \
+        "Use: ${0##*/} <project_name> <server_name>"
+    exit 1
+}
+
+if [ $# -ne 2 ]; then
+    usage
+fi
+
+info "Installing apache vhost..."
+
+PROJECT_NAME="$1"
+SERVER_NAME="$2"
+
+# Define the logs path in the project
+LOG_DIR="$(pwd)/storage/logs"
+
+# Create the logs directory if it doesn't exist
+if [ ! -d "$LOG_DIR" ]; then
+    mkdir -p "$LOG_DIR"
+fi
+
+# permissions for apache2
+sudo chgrp www-data "$LOG_DIR"
+sudo chmod g+w "$LOG_DIR"
+
+if $SHARED_SCRIPTS/create-apache-vhost "$SERVER_NAME" "$LOG_DIR"; then
+    echo "    Apache Vhost for $PROJECT_NAME configurated"
+else
+    echo "    Could not install vhost"
+    exit 1
+fi
+
+exit 0

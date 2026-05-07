@@ -1,0 +1,43 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/lib/styles.sh"
+
+usage() {
+    gum style --foreground 212 --border normal --padding "0 1" \
+        "Arguments are missing" "" \
+        "Use: ${0##*/} <project_name>"
+    exit 1
+}
+
+if [ $# -ne 1 ]; then
+    usage
+fi
+
+PROJECT_NAME="$1"
+
+info "Installing laravel..."
+
+cd /var/www
+
+if [ ! -d "$PROJECT_NAME" ]; then
+    gum spin --spinner dot --title "    Installing Laravel project '$PROJECT_NAME'..." -- \
+        bash -c "laravel new '$PROJECT_NAME' --livewire --database='mysql' --pest --no-interaction > /tmp/laravel_install.log 2>&1"
+else
+    echo "    laravel project '$PROJECT_NAME' already exists"
+fi
+
+# check if /tmp/laravel_install.log contains database errors
+if [ -s "/tmp/laravel_install.log" ]; then
+    if grep -qiE "SQLSTATE" /tmp/laravel_install.log; then
+        echo ""
+        # show database error in terminal
+        gum style --foreground 196 --border normal --padding "0 1" "database error in installation log :"
+        
+        grep -iE -C 3 "SQLSTATE" /tmp/laravel_install.log | gum format
+    fi
+fi
+
+success "laravel installation succeeded"
+
+exit 0

@@ -1,0 +1,70 @@
+#!/bin/bash
+
+while [ true ]; do
+
+    VALID=true
+
+    while [ -z "$RAW_PROJECT_NAME" ]; do
+        RAW_PROJECT_NAME=$(gum input --padding "0 1" --placeholder "Name of project is obligated..." --header "Name of your project ?")
+        # stop the script when user uses CTRL+C
+        [ $? -gt 0 ] && exit 1
+    done
+
+    # sanitize $RAW_PROJECT_NAME
+    PROJECT_NAME=$(echo "$RAW_PROJECT_NAME"  | tr ' ' '-' | tr '_' '-' | tr -dc '[:alnum:]-\n\r' | tr '[:upper:]' '[:lower:]')
+
+    info "Checking for project '$PROJECT_NAME'..."
+
+    # process input
+    PROJECT_NAME_UNDERSCORED=$(echo "$PROJECT_NAME" | tr '-' '_') 
+
+    DB_NAME="${PROJECT_NAME_UNDERSCORED}_db"
+    DB_USER=$PROJECT_NAME_UNDERSCORED
+    DB_PASSWORD="${PROJECT_NAME_UNDERSCORED}@mysql"
+
+    SERVER_NAME="${PROJECT_NAME}.local"
+
+    # check if folder exists in /var/www
+    if [ -d "/var/www/$PROJECT_NAME" ]; then
+        warning "project '$PROJECT_NAME' already exists. laravel installer will skip execution"
+        VALID=false
+    fi
+
+    # check if database exists
+    if sudo mysql -e "USE $DB_NAME" 2>/dev/null; then
+        warning "Database '$DB_NAME' exists. Mysql will skip database creation"
+        VALID=false
+    fi
+
+    # check if vhost exists
+    if [ -f "/etc/apache2/sites-available/${SERVER_NAME}.conf" ]; then
+        warning "Apache vhost '$SERVER_NAME' exists. Apache will skip vhost creation"
+        VALID=false
+    fi
+
+    # check if project exists on GitHub
+    if gh repo view "$PROJECT_NAME" &>/dev/null; then
+        warning "GitHub repository '$PROJECT_NAME' is already taken. Project will not be pushed"
+        GIT_PARAMS[permission]=false
+        VALID=false
+    fi
+
+    # check if installation has to be continued
+    if ! $VALID; then
+        if gum confirm "Continue the installation of project '$PROJECT_NAME' despite warnings above ?" >&2; then 
+            break
+        fi
+    else
+        break
+    fi
+
+    RAW_PROJECT_NAME=""
+done
+
+unset RAW_PROJECT_NAME
+unset PROJECT_NAME_UNDERSCORED
+unset VALID
+
+info "Proceeding with the installation of project '$PROJECT_NAME'"
+
+return 0

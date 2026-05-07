@@ -1,0 +1,30 @@
+#!/bin/bash
+
+HISTORY_FILE="$SCRIPT_DIR/.installed_packages"
+FILTERED_DEV_PACKAGES="filtered_dev_packages.tmp"
+FILTERED_PROD_PACKAGES="filtered_prod_packages.tmp"
+
+filter_new_packages "$HISTORY_FILE" "$SHARED_DATA_LISTS/dev-packages" "$PROJECT_NAME" > "$FILTERED_DEV_PACKAGES"
+filter_new_packages "$HISTORY_FILE" "$SHARED_DATA_LISTS/production-packages" "$PROJECT_NAME" > "$FILTERED_PROD_PACKAGES"
+
+# select additional dev packages
+if [[ -s "$FILTERED_DEV_PACKAGES" ]]; then
+    DEV_PACKAGES=$(multi_select "Which dev packages would you like to add ?" "$FILTERED_DEV_PACKAGES")
+    [[ -n "$DEV_PACKAGES" ]] && add_to_install "$DEV_PACKAGES"
+fi
+
+
+# select additional production packages
+if [[ -s "$FILTERED_PROD_PACKAGES" ]]; then
+    PROD_PACKAGES=$(multi_select "Which production packages would you like to add ?" "$FILTERED_PROD_PACKAGES")
+    [[ -n "$PROD_PACKAGES" ]] && add_to_install "$PROD_PACKAGES"
+fi
+
+
+unset $DEV_PACKAGES
+unset $PROD_PACKAGES
+rm -f $FILTERED_DEV_PACKAGES
+rm -f $FILTERED_PROD_PACKAGES
+
+return 0
+

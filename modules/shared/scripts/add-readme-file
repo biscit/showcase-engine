@@ -1,0 +1,28 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/styles.sh"
+
+info "Creating README.md file..."
+
+usage() {
+    gum style --foreground 212 --border normal --padding "0 1" \
+        "Arguments are missing" "" \
+        "Use: ${0##*/} <project_name>"
+    exit 1
+}
+
+if [ $# -ne 1 ]; then
+    usage
+fi
+
+PROJECT_NAME="$1"
+
+cat <<EOF > README.md
+![Tests Status](https://github.com/biscit/$PROJECT_NAME/actions/workflows/tests.yml/badge.svg)
+
+# $PROJECT_NAME
+
+EOF
+
+exit 0

@@ -1,0 +1,32 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../lib/styles.sh"
+MAKE_FILE="$SCRIPT_DIR/../../../Makefile"
+
+info "Running post-install actions..."
+
+PACKAGES="$1"
+
+if [ -f "$PACKAGES" ]; then
+    # read the file line by line
+    while IFS= read -r line <&3; do
+        package=$(echo "$line" | xargs)
+        [[ -z "$package" ]] && continue
+        case "$package" in
+            "barryvdh/laravel-ide-helper")
+                make -f "$MAKE_FILE" setup-ide
+                ;;
+            "barryvdh/laravel-debugbar")
+                make -f "$MAKE_FILE" setup-debugbar
+                ;;
+            "spatie/laravel-permission")
+                make -f "$MAKE_FILE" setup-permissions
+                ;;
+        esac
+    done 3< "$PACKAGES"
+
+    rm "$PACKAGES"
+fi
+
+exit 0

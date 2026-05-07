@@ -1,0 +1,38 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/../shared/lib/styles.sh"
+
+usage() {
+    gum style --foreground 212 --border normal --padding "0 1" \
+        "Arguments are missing" "" \
+        "Use: ${0##*/} <project_name>"
+    exit 1
+}
+
+if [ $# -ne 1 ]; then
+    usage
+fi
+
+info "setting permissions..."
+
+PROJECT_NAME="$1"
+DIRECTORY="/var/www/$PROJECT_NAME"
+USER=$USER
+
+# Set owner to current user and group as www-data
+chown -R "$USER:www-data" "$DIRECTORY"
+
+# Standard permission: 775 for directories (drwxrwxr-x)
+find "$DIRECTORY" -type d -exec chmod 775 {} +
+
+# Standard permission: 664 for files (-rw-rw-r--)
+find "$DIRECTORY" -type f -exec chmod 664 {} +
+
+# Activate SGID-bit on all directories
+# All new directories inherit group 'www-data'
+find "$DIRECTORY" -type d -exec chmod g+s {} +
+
+
+exit 0
+

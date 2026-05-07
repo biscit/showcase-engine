@@ -1,0 +1,56 @@
+#!/bin/bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+source "$SCRIPT_DIR/../lib/styles.sh"
+
+usage() {
+    gum style --foreground 212 --border normal --padding "0 1" \
+        "Arguments are missing" "" \
+        "Use: ${0##*/} <framework_name>"
+    exit 1
+}
+
+# Check arguments
+if [ $# -ne 1 ]; then
+    usage
+fi
+
+FRAMEWORK=$1
+
+case $FRAMEWORK in
+    laravel)
+        if ! command -v laravel &> /dev/null; then
+            # Check composer bin
+            COMPOSER_BIN=$(composer global config bin-dir --absolute 2>/dev/null)
+            if [ ! -f "$COMPOSER_BIN/laravel" ]; then
+                error "Laravel installer is missing."
+                exit 1
+            fi
+        fi
+        ;;
+
+    symfony)
+        if ! command -v symfony &> /dev/null; then
+            # Check composer bin
+            COMPOSER_BIN=$(composer global config bin-dir --absolute 2>/dev/null)
+            if [ ! -f "$COMPOSER_BIN/symfony" ]; then
+                error "Under construction. Symfony installer is missing"
+                exit 1
+            fi
+        fi
+        ;;
+
+    drupal)
+        if ! command -v ddev &> /dev/null; then
+            error "Under construction. DDEV is missing"
+            exit 1
+        fi
+        ;;
+
+    *)
+esac
+
+echo "$FRAMEWORK"
+
+exit 0
