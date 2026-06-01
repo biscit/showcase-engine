@@ -1,3 +1,7 @@
+**IMPORTANT NOTICE:** This is the legacy version (v1) of the engine, kept online for code comparison purposes. The architecture has been completely refactored from scratch.
+
+**Please visit the active, modular v2 repository here: [showcase-engine-2](https://github.com/biscit/showcase-engine-2)**
+
 # Engine Showcase: Modular Bash Installer
 
 A professional demonstration of advanced Bash scripting, automating the deployment of a full-stack Laravel environment.
